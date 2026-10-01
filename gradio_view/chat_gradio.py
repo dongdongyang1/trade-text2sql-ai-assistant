@@ -1,9 +1,15 @@
-from typing import List, Dict
+﻿from typing import List, Dict
 import os
 import sys
 
 # 保证从任意目录运行都能找到项目根下的 sql_graph 包
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# 让 Gradio 对 localhost 的内部自检请求绕过系统代理（否则代理会劫走 127.0.0.1 导致 502）
+os.environ["NO_PROXY"] = "localhost,127.0.0.1"
+os.environ["no_proxy"] = "localhost,127.0.0.1"
+
+from sql_graph.vision import recognize_product
 
 import gradio as gr
 from PIL import Image, ImageDraw, ImageFont
@@ -46,11 +52,59 @@ async def run_graph_once(user_input: str) -> str:
 async def execute_graph_gradio(chat_bot: List[Dict]) -> List[Dict]:
     if not chat_bot:  # 空聊天记录（例如空输入就提交）→ 直接返回，不触发图
         return chat_bot
-    user_input = chat_bot[-1].get("content", "")
-    if isinstance(user_input, list):  # gradio 新版 content 可能是 list 格式，转回纯文本
-        user_input = " ".join(p.get("text", "") for p in user_input if isinstance(p, dict))
+    content = chat_bot[-1].get("content", "")
+
+    # 拆出"文字"和"图片路径"（parts 列表 / 原始 dict / 纯文本 三种都兼容）
+    text, image_path = "", None
+    ## ① parts 列表：do_graph 转换过 / gradio 改写过的 → 图片在 file.path 或 path
+    if isinstance(content, list):
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            t = part.get("type")
+            if t == "text":
+                text += part.get("text", "")
+            elif t in ("image", "file"):  # Gradio 会把图片转成 {"file":{"path":...},"type":"file"}
+                f = part.get("file")
+                if isinstance(f, dict):
+                    image_path = f.get("path") or image_path
+                elif isinstance(f, str):
+                    image_path = f or image_path
+                elif part.get("path"):
+                    image_path = part["path"]
+    # ② 原始 dict：{"text","files"} 没转换过 → 图片在 files[0]
+    elif isinstance(content, dict):
+        text = content.get("text") or ""
+        files = content.get("files") or []
+        if files:
+            image_path = files[0]
+    # ③ 纯字符串：只打字没传图 → 直接当文字
+    else:
+        text = content
+
+    if not text and not image_path: # 空输入，直接返回
+        return chat_bot
+
     try:
-        result = await run_graph_once(user_input)
+        if image_path: # 有图片 → 先识别，再查库
+            desc = recognize_product(image_path)
+            print(f"[Gradio] 识别结果: {desc[:120]}")
+            # 从识别结果里提取"分类"（如：海鲜），直接写进问题强制查该分类
+            cat = ""
+            for line in desc.splitlines():
+                if line.strip().startswith("分类"):
+                    cat = line.split("：", 1)[-1].split(":", 1)[-1].strip()
+            if cat and cat != "未知":
+                if text:
+                    question = f"用户上传了一张图片并询问“{text}”。图片中识别出产品属于【{cat}】分类，请理解为：用户想了解【{cat}】分类的销售情况。请专门分析【{cat}】分类：总销售额、订单数、产品数量、占全库销售额比例、按年趋势。直接查询数据库回答，不要统计全库整体数据。"
+                else:
+                    question = f"用户上传了一张图片，识别出产品属于【{cat}】分类。请专门分析【{cat}】分类：总销售额、订单数、产品数量、占全库销售额比例、按年趋势。直接查询数据库回答，不要统计全库整体数据。"
+            else:
+                question = f"用户上传了一张图片，识别结果为：{desc}。请围绕图中产品所属分类做专项销售分析，不要统计全库整体数据。请结合用户问题（若有：{text}）作答。"
+
+        else:
+            question = text
+        result = await run_graph_once(question)
         if not result:
             result = "我暂时没拿到有效结果，换个说法再试试？"
     except Exception as e:
@@ -63,7 +117,16 @@ async def execute_graph_gradio(chat_bot: List[Dict]) -> List[Dict]:
 def do_graph(user_input, chat_bot):
     """输入框提交后，执行的函数"""
     if user_input:
-        chat_bot.append({"role": "user", "content": user_input})
+        content = user_input
+        #把输入框提交的原始值，改写成 Chatbot 组件认的格式，然后存进聊天记录
+        if isinstance(content, dict):  # MultimodalTextbox 格式 {"text","files"} → Chatbot 支持的 parts 格式
+            parts = []
+            if content.get("text"):
+                parts.append({"text": content["text"], "type": "text"})
+            for f in content.get("files") or []:
+                parts.append({"path": f, "type": "image"})
+            content = parts if parts else ""
+        chat_bot.append({"role": "user", "content": content})
     return "", chat_bot
 
 
@@ -195,23 +258,31 @@ with gr.Blocks(title="Text2SQL AI 助手") as instance:
             render_markdown=True,
         )
 
-        # 输入区
+        # 输入区（支持文字 + 图片）
         with gr.Row():
-            input_textbox = gr.Textbox(
+            input_box = gr.MultimodalTextbox(
                 elem_id="inputbox",
-                placeholder="试试问：总共有多少种产品？",
+                placeholder="输入问题，或拖入一张产品图片",
+                file_types=["image"],
+                file_count="single",
                 scale=6,
-                container=False,
             )
             send_btn = gr.Button("发送", elem_id="send-btn", scale=1)
 
     # 事件绑定：回车 / 点发送，两条路都走同一套逻辑
-    input_textbox.submit(
-        do_graph, [input_textbox, chatbot], [input_textbox, chatbot]
+    input_box.submit(
+        do_graph, [input_box, chatbot], [input_box, chatbot]
     ).then(execute_graph_gradio, chatbot, chatbot)
     send_btn.click(
-        do_graph, [input_textbox, chatbot], [input_textbox, chatbot]
+        do_graph, [input_box, chatbot], [input_box, chatbot]
     ).then(execute_graph_gradio, chatbot, chatbot)
 
 if __name__ == "__main__":
     instance.launch(debug=True, theme=theme, css=CSS)
+
+
+
+
+
+
+
