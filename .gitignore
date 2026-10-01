@@ -1,0 +1,192 @@
+﻿# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+# .python-version
+
+# pipenv
+#Pipfile.lock
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# ====================== 新增 Agent 项目专属规则 ======================
+# API密钥拓展（防止各种形式密钥文件）
+.env.local
+.env.dev
+.env.prod
+*.env
+.env.docker
+
+# 本地大模型权重文件
+*.gguf
+*.bin
+*.safetensors
+*.onnx
+models/
+model_cache/
+
+# 向量数据库（chroma、FAISS、Qdrant本地持久化文件，体积巨大禁止上传）
+chroma_db/
+faiss_index/
+vector_db/
+qdrant_storage/
+
+# LLM、LangChain运行缓存
+.langchain_cache/
+.cache/
+
+# 日志目录
+logs/
+tmp/
+temp/
+
+# 训练/运行产生的导出文件
+outputs/
+results/
+
+# IDE 配置文件
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# 图片/媒体临时资源
+
+# MinerU 解析缓存（体积巨大，含原始PDF和图片）
+.mineru_cache/
+
+# 评估运行产物
+eval_results/
+
+# 备份文件
+*.bak
+
+# 日志文件
+docker_logs.txt
+
+# 运行时自动生成的头像（不传）
+gradio_view/assets/
+# 测试用临时脚本
+_*.py
+
